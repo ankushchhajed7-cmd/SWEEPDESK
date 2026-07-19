@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="theme-color" content="#0a0a0a" />
+<link rel="manifest" href="manifest.webmanifest" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="SweepDesk" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<title>SweepDesk — SMC Signal Scanner</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%230a0a0a'/><text y='72' x='50' font-size='64' text-anchor='middle' fill='%23ffb000'>S</text></svg>" />
+<style>
+  :root{
+    --bg:#0a0a0a; --panel:#111110; --panel2:#161613; --line:#2a2a24;
+    --amber:#ffb000; --amber-dim:#8a6000; --amber-soft:#3a2c08;
+    --green:#33d17a; --red:#ff5252; --blue:#5ac8fa; --violet:#6b4dff; --muted:#7d7a6e; --text:#e8e2cf;
+    --mono:'SF Mono',ui-monospace,'Cascadia Mono','Roboto Mono',Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--mono);font-size:14px;line-height:1.4}
+  body{padding:0 10px 90px;max-width:820px;margin:0 auto}
+  h1,h2,h3{margin:0;font-weight:600;letter-spacing:.04em}
+  a{color:var(--amber)}
+  button{font-family:var(--mono);cursor:pointer;border:1px solid var(--amber-dim);background:var(--amber-soft);color:var(--amber);padding:8px 12px;border-radius:4px;font-size:13px;letter-spacing:.03em}
+  button:active{transform:translateY(1px)}
+  button.ghost{background:transparent;border-color:var(--line);color:var(--muted)}
+  button.solid{background:var(--amber);color:#000;border-color:var(--amber);font-weight:700}
+  input,select{font-family:var(--mono);background:#000;border:1px solid var(--line);color:var(--text);padding:8px;border-radius:4px;font-size:13px;width:100%}
+  label{display:block;color:var(--muted);font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px}
+  .row{display:flex;gap:8px;flex-wrap:wrap}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;margin:10px 0}
+  .mut{color:var(--muted)}
+  .amber{color:var(--amber)} .green{color:var(--green)} .red{color:var(--red)} .blue{color:var(--blue)} .violet{color:var(--violet)}
+  .pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;letter-spacing:.06em;border:1px solid currentColor}
+  .grid6{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+  @media(min-width:560px){.grid6{grid-template-columns:repeat(3,1fr)}}
+  .divider{height:1px;background:var(--line);margin:10px 0}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th,td{text-align:left;padding:6px 6px;border-bottom:1px solid var(--line);white-space:nowrap}
+  th{color:var(--muted);font-weight:500;font-size:10px;letter-spacing:.08em;text-transform:uppercase}
+  .scrollx{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  header{position:sticky;top:0;z-index:20;background:linear-gradient(180deg,#0a0a0a 70%,transparent);padding:12px 0 6px;display:flex;align-items:center;justify-content:space-between}
+  .logo{display:flex;align-items:baseline;gap:8px}
+  .logo b{font-size:19px;color:var(--amber);letter-spacing:.12em}
+  .logo small{color:var(--muted);font-size:10px;letter-spacing:.14em}
+  .clock{font-size:12px;color:var(--amber);text-align:right}
+  .clock small{display:block;color:var(--muted);font-size:9px;letter-spacing:.1em}
+  .tile{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:8px;font-size:12px;cursor:pointer;transition:border-color .15s}
+  .tile.sel{border-color:var(--amber)}
+  .tile .p{font-weight:700;letter-spacing:.05em}
+  .tile .st{font-size:10px;margin-top:3px}
+  .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;vertical-align:middle}
+  .dot.g{background:var(--green)} .dot.r{background:var(--red)} .dot.o{background:var(--muted)} .dot.a{background:var(--amber)} .dot.b{background:var(--blue)}
+  .sig{border-left:3px solid var(--amber);padding:10px 12px;background:var(--panel2);border-radius:6px;margin:8px 0}
+  .sig.buy{border-left-color:var(--green)} .sig.sell{border-left-color:var(--red)}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;font-size:12px;margin-top:6px}
+  .kv span:nth-child(odd){color:var(--muted)}
+  canvas{width:100%;height:280px;display:block;background:#000;border-radius:6px;border:1px solid var(--line);touch-action:none}
+  .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:10px;color:var(--muted);margin-top:6px}
+  .legend i{width:10px;height:10px;display:inline-block;margin-right:3px;vertical-align:middle;border-radius:2px}
+  .stat{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:8px;text-align:center}
+  .stat b{display:block;font-size:18px;color:var(--amber)}
+  .stat small{color:var(--muted);font-size:10px;letter-spacing:.06em}
+  .tabbar{position:fixed;bottom:0;left:0;right:0;background:#0c0c0b;border-top:1px solid var(--line);display:flex;z-index:30}
+  .tabbar button{flex:1;border:none;border-radius:0;background:transparent;color:var(--muted);padding:12px 0;font-size:11px;letter-spacing:.06em}
+  .tabbar button.on{color:var(--amber);box-shadow:inset 0 2px 0 var(--amber)}
+  .view{display:none} .view.on{display:block}
+  .warn{background:#1a0f00;border:1px solid var(--amber-dim);color:var(--amber);padding:8px 10px;border-radius:6px;font-size:11px;line-height:1.5}
+  .fields{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .toast{position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:var(--amber);color:#000;padding:8px 16px;border-radius:20px;font-size:12px;font-weight:700;z-index:50;opacity:0;transition:opacity .2s;pointer-events:none}
+  .toast.show{opacity:1}
+  .tag{font-size:9px;padding:1px 5px;border-radius:3px;border:1px solid var(--line);color:var(--muted);letter-spacing:.05em}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo"><b>SWEEPDESK</b><small>SMC · M15</small></div>
+  <div class="clock"><span id="istClock">--:--:--</span><small id="istDate">IST</small></div>
+</header>
+
+<!-- ============ SCAN ============ -->
+<div class="view on" id="v-scan">
+  <div class="card" id="apiCard">
+    <label>TwelveData API Key</label>
+    <div class="row">
+      <input id="apiKey" type="password" placeholder="paste key…" style="flex:1" />
+      <button id="saveKey">Save</button>
+    </div>
+    <div class="mut" style="font-size:11px;margin-top:6px">Sirf is device pe save. Free: 8 req/min, 800/day. 6 pairs × 15 min = safe.</div>
+  </div>
+
+  <div class="row" style="align-items:center;justify-content:space-between">
+    <div class="row" style="align-items:center;gap:6px">
+      <button id="scanBtn" class="solid">Scan Now</button>
+      <button id="autoBtn" class="ghost">Auto: OFF</button>
+      <button id="installBtn" class="ghost">⤓ Install</button>
+    </div>
+    <div class="mut" style="font-size:11px" id="lastScan">never scanned</div>
+  </div>
+
+  <div class="grid6" id="pairGrid" style="margin-top:10px"></div>
+
+  <div class="card">
+    <div class="row" style="justify-content:space-between;align-items:center">
+      <h3 class="amber">LIVE ORDERS</h3>
+      <span class="mut" style="font-size:11px" id="liveCount">0 pending · 0 open</span>
+    </div>
+    <div id="liveSignals"><div class="mut" style="font-size:12px;padding:8px 0">Koi active order nahi. Scan chalao.</div></div>
+  </div>
+</div>
+
+<!-- ============ VERIFY ============ -->
+<div class="view" id="v-verify">
+  <div class="card">
+    <div class="row" style="justify-content:space-between;align-items:center">
+      <h3 class="amber">VERIFY DETECTION</h3>
+      <select id="verifyPair" style="width:auto"></select>
+    </div>
+    <div class="mut" style="font-size:11px;margin:6px 0">Detection galat lage toh Settings me tune kar.</div>
+    <canvas id="chart"></canvas>
+    <div class="legend">
+      <span><i style="background:#33d17a"></i>Swing Low</span>
+      <span><i style="background:#ff5252"></i>Swing High</span>
+      <span><i style="background:#ffb000"></i>Sweep</span>
+      <span><i style="background:#5ac8fa"></i>CHoCH</span>
+      <span><i style="background:#6b4dff"></i>FVG (limit entry)</span>
+    </div>
+    <div class="divider"></div>
+    <div id="verifyText" style="font-size:12px"></div>
+  </div>
+</div>
+
+<!-- ============ STATS / LOG ============ -->
+<div class="view" id="v-log">
+  <div class="card">
+    <h3 class="amber">PERFORMANCE</h3>
+    <div class="mut" style="font-size:11px;margin:4px 0 10px">Accuracy = TP / (TP+SL). Ambiguous candle = SL (honest). Yeh EA go/no-go decide karega.</div>
+    <div class="grid6" style="grid-template-columns:repeat(3,1fr)">
+      <div class="stat"><b id="stClosed">0</b><small>CLOSED</small></div>
+      <div class="stat"><b id="stAcc" class="green">0%</b><small>ACCURACY</small></div>
+      <div class="stat"><b id="stExp">0.00R</b><small>EXPECTANCY</small></div>
+    </div>
+    <div class="grid6" style="grid-template-columns:repeat(3,1fr);margin-top:8px">
+      <div class="stat"><b id="stTP" class="green">0</b><small>TP HIT</small></div>
+      <div class="stat"><b id="stSL" class="red">0</b><small>SL HIT</small></div>
+      <div class="stat"><b id="stPend" class="blue">0</b><small>PENDING</small></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 class="amber">PAIR-WISE</h3>
+    <div class="scrollx" style="margin-top:8px">
+      <table id="pairTable">
+        <thead><tr><th>Pair</th><th>Sig</th><th>TP</th><th>SL</th><th>Acc%</th><th>Exp R</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 class="amber">MONTHLY</h3>
+    <div class="scrollx" style="margin-top:8px">
+      <table id="monthTable">
+        <thead><tr><th>Month</th><th>Trades</th><th>TP</th><th>SL</th><th>Acc%</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row" style="justify-content:space-between;align-items:center">
+      <h3 class="amber">SIGNAL LOG</h3>
+      <button class="ghost" id="clearLog">Clear</button>
+    </div>
+    <div class="scrollx">
+      <table id="logTable">
+        <thead><tr><th>Time</th><th>Pair</th><th>Type</th><th>Dir</th><th>Entry</th><th>SL</th><th>TP</th><th>RR</th><th>Status</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SETTINGS ============ -->
+<div class="view" id="v-set">
+  <div class="card">
+    <h3 class="amber">INSTALL CHECK</h3>
+    <div class="mut" style="font-size:11px;margin:4px 0 8px">App install nahi ho rahi? Yeh chala ke dekh kya fail hai. (Deployed https URL pe hi sahi chalega.)</div>
+    <button id="diagBtn" class="solid" style="width:100%">Run Install Check</button>
+    <div id="diagOut" style="margin-top:10px;font-size:12px"></div>
+  </div>
+
+  <div class="card">
+    <h3 class="amber">DETECTION PARAMS</h3>
+    <div class="warn" style="margin:8px 0">Real chart pe dekhne ke baad hi tune. Sab ATR-normalized — ek set 6 pairs pe chalega.</div>
+    <div class="fields">
+      <div><label>Swing Lookback (L)</label><input id="s_L" type="number" min="1" max="5" /></div>
+      <div><label>ATR Period</label><input id="s_atr" type="number" min="5" max="50" /></div>
+      <div><label>Sweep Tol (×ATR)</label><input id="s_swtol" type="number" step="0.05" /></div>
+      <div><label>SL Buffer (×ATR)</label><input id="s_slbuf" type="number" step="0.05" /></div>
+      <div><label>Recent Window (bars)</label><input id="s_win" type="number" min="3" max="15" /></div>
+      <div><label>Min RR filter</label><input id="s_minrr" type="number" step="0.1" /></div>
+      <div><label>Limit Expiry (bars)</label><input id="s_expiry" type="number" min="3" max="48" /></div>
+      <div><label>Fixed / Fallback RR</label><input id="s_rr" type="number" step="0.1" /></div>
+      <div><label>TP Mode</label><select id="s_tpmode"><option value="liq">Opposing Liquidity</option><option value="rr">Fixed RR</option></select></div>
+    </div>
+    <button class="solid" id="saveSet" style="margin-top:12px;width:100%">Save Params</button>
+  </div>
+
+  <div class="card">
+    <h3 class="amber">TELEGRAM ALERTS</h3>
+    <div class="mut" style="font-size:11px;margin:4px 0 8px">Screen off pe bhi signal. (SignalBridge pattern.)</div>
+    <label>Bot Token</label><input id="tg_token" type="password" placeholder="123456:ABC…" />
+    <label style="margin-top:8px">Chat ID</label><input id="tg_chat" placeholder="your chat id" />
+    <div class="row" style="margin-top:10px"><button id="tgSave">Save</button><button class="ghost" id="tgTest">Send Test</button></div>
+  </div>
+
+  <div class="card">
+    <h3 class="amber">SOUND &amp; VIBRATION</h3>
+    <div class="row" style="margin-top:8px;align-items:center;justify-content:space-between">
+      <span class="mut" style="font-size:12px">Naya signal pe beep + vibrate</span>
+      <button id="soundBtn" class="ghost">Sound: ON</button>
+    </div>
+    <div class="mut" style="font-size:10px;margin-top:6px">Note: mobile browser me sound tabhi bajega jab app khula ho / recent tab me ho. Background alert Telegram se pakka milega.</div>
+  </div>
+
+  <div class="card">
+    <h3 class="amber">DATA</h3>
+    <div class="row" style="margin-top:8px"><button id="backupBtn" class="ghost">Backup JSON</button><button id="restoreBtn" class="ghost">Restore</button></div>
+    <input id="restoreFile" type="file" accept="application/json" style="display:none" />
+  </div>
+
+  <div class="card mut" style="font-size:11px;line-height:1.6">
+    <b class="amber">MODEL:</b> Sweep → CHoCH → FVG → PA.<br/>
+    Entry = <b>LIMIT</b> at FVG proximal edge (retrace). No FVG → MARKET at CHoCH close.<br/>
+    Order lifecycle: PENDING → OPEN (fill) → WIN/LOSS. Fill na ho window me → EXPIRED.<br/>
+    SL = sweep wick ± buffer. TP = opposing liquidity / fixed RR. v1.1
+  </div>
+</div>
+
+<div class="tabbar">
+  <button class="on" data-v="scan">SCAN</button>
+  <button data-v="verify">VERIFY</button>
+  <button data-v="log">STATS</button>
+  <button data-v="set">SETTINGS</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   SweepDesk v1.1 — SMC signal scanner (sweep→CHoCH→FVG→PA)
+   Limit-order signals · pending/fill state machine · pair+monthly stats
+   Single-file PWA · vanilla JS · GitHub Pages ready
+   ============================================================ */
+
+const PAIRS = [
+  {d:'XAUUSD', s:'XAU/USD', dp:2},
+  {d:'EURUSD', s:'EUR/USD', dp:5},
+  {d:'GBPUSD', s:'GBP/USD', dp:5},
+  {d:'USDJPY', s:'USD/JPY', dp:3},
+  {d:'AUDUSD', s:'AUD/USD', dp:5},
+  {d:'USDCAD', s:'USD/CAD', dp:5},
+];
+
+const DEF = { L:2, atr:14, swtol:0.15, slbuf:0.25, win:8, minrr:1.5, tpmode:'liq', rr:2.0, expiry:12 };
+
+const LS = {
+  get:(k,f)=>{ try{const v=localStorage.getItem('sd_'+k);return v==null?f:JSON.parse(v);}catch(e){return f;} },
+  set:(k,v)=>{ try{localStorage.setItem('sd_'+k,JSON.stringify(v));}catch(e){} }
+};
+let S = {
+  key: LS.get('key',''),
+  params: Object.assign({}, DEF, LS.get('params',{})),
+  tg: LS.get('tg',{token:'',chat:''}),
+  sound: LS.get('sound',true),
+  log: LS.get('log',[]),
+  cache: {},
+  selPair: PAIRS[0].d,
+  auto:false, timer:null
+};
+// migrate old 'out' -> 'status'
+S.log.forEach(s=>{ if(!s.status){ s.status = s.out==='WIN'?'WIN':s.out==='LOSS'?'LOSS':'OPEN'; } if(!s.orderType) s.orderType='MARKET'; });
+
+function save(){ LS.set('log',S.log); }
+function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1800); }
+function fmt(v,dp){ return v==null?'—':Number(v).toFixed(dp); }
+function pairDp(d){ const p=PAIRS.find(x=>x.d===d); return p?p.dp:5; }
+// IST 12-hour AM/PM
+function istTime(iso){ return new Date(iso).toLocaleString('en-IN',{hour12:true,timeZone:'Asia/Kolkata',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}); }
+// alert beep (double) + vibrate
+function alertBeep(){
+  if(!S.sound) return;
+  try{
+    const ac=new (window.AudioContext||window.webkitAudioContext)();
+    [0,0.25].forEach(t0=>{ const o=ac.createOscillator(),g=ac.createGain(); o.connect(g); g.connect(ac.destination);
+      o.type='sine'; o.frequency.value=880; const t=ac.currentTime+t0;
+      g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.35,t+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t+0.18);
+      o.start(t); o.stop(t+0.2); });
+  }catch(e){}
+  if(navigator.vibrate) navigator.vibrate([200,100,200]);
+}
+
+/* ============ DETECTION ENGINE ============ */
+function computeATR(c, period){
+  if(c.length < period+1) return null;
+  let tr=[];
+  for(let i=1;i<c.length;i++) tr.push(Math.max(c[i].h-c[i].l, Math.abs(c[i].h-c[i-1].c), Math.abs(c[i].l-c[i-1].c)));
+  const s=tr.slice(-period);
+  return s.reduce((a,b)=>a+b,0)/s.length;
+}
+function findSwings(c, L){
+  const sw=[];
+  for(let i=L;i<c.length-L;i++){
+    let isH=true,isL=true;
+    for(let j=i-L;j<=i+L;j++){ if(j===i) continue;
+      if(c[j].h >= c[i].h) isH=false;
+      if(c[j].l <= c[i].l) isL=false; }
+    if(isH) sw.push({idx:i,type:'H',price:c[i].h});
+    if(isL) sw.push({idx:i,type:'L',price:c[i].l});
+  }
+  return sw.sort((a,b)=>a.idx-b.idx);
+}
+function lastBefore(sw, idx, type){ for(let i=sw.length-1;i>=0;i--) if(sw[i].idx<idx && sw[i].type===type) return sw[i]; return null; }
+function nearestAbove(sw, price, type){ let b=null; for(const s of sw){ if(s.type===type&&s.price>price){ if(!b||s.price<b.price)b=s; } } return b; }
+function nearestBelow(sw, price, type){ let b=null; for(const s of sw){ if(s.type===type&&s.price<price){ if(!b||s.price>b.price)b=s; } } return b; }
+
+function isBullPA(c,i){
+  const cur=c[i], pr=c[i-1];
+  const eng = cur.c>cur.o && pr.c<pr.o && cur.c>=pr.o && cur.o<=pr.c;
+  const body=Math.abs(cur.c-cur.o), lw=Math.min(cur.o,cur.c)-cur.l, rng=cur.h-cur.l||1e-9;
+  return eng || (lw>body*1.5 && lw/rng>0.5 && cur.c>cur.o);
+}
+function isBearPA(c,i){
+  const cur=c[i], pr=c[i-1];
+  const eng = cur.c<cur.o && pr.c>pr.o && cur.c<=pr.o && cur.o>=pr.c;
+  const body=Math.abs(cur.c-cur.o), uw=cur.h-Math.max(cur.o,cur.c), rng=cur.h-cur.l||1e-9;
+  return eng || (uw>body*1.5 && uw/rng>0.5 && cur.c<cur.o);
+}
+// bullish FVG (gap up): high[k] < low[k+2]  -> zone [c[k].h .. c[k+2].l], proximal edge = hi (top)
+function findBullFVG(c, from, to){ for(let k=to-2;k>=from;k--){ if(c[k].h < c[k+2].l) return {lo:c[k].h, hi:c[k+2].l, i:k+1}; } return null; }
+// bearish FVG (gap down): low[k] > high[k+2] -> zone [c[k+2].h .. c[k].l], proximal edge = lo (bottom)
+function findBearFVG(c, from, to){ for(let k=to-2;k>=from;k--){ if(c[k].l > c[k+2].h) return {lo:c[k+2].h, hi:c[k].l, i:k+1}; } return null; }
+
+function detectSetup(c, P, pdh, pdl){
+  const debug={swings:[],sweep:null,choch:null,fvg:null,atr:null};
+  const atr=computeATR(c,P.atr); debug.atr=atr;
+  if(!atr || c.length < 30) return {signal:null,debug};
+  const sw=findSwings(c,P.L); debug.swings=sw;
+  const N=c.length, last=N-1, cur=c[last].c;
+  const tol=P.swtol*atr, slbuf=P.slbuf*atr;
+  const start=Math.max(P.L, N-P.win-1);
+
+  // ---- BULLISH ----
+  for(let s=last; s>=start; s--){
+    const levels=[]; const swl=lastBefore(sw,s,'L'); if(swl) levels.push(swl.price); if(pdl!=null) levels.push(pdl);
+    for(const lvl of levels){
+      if(c[s].l < lvl && c[s].l >= lvl-Math.max(tol,atr*0.6) && c[s].c > lvl){
+        const chLvl=lastBefore(sw,s,'H'); if(!chLvl) continue;
+        for(let k=s;k<=last;k++){
+          if(c[k].c > chLvl.price && isBullPA(c,k)){
+            const fvg=findBullFVG(c,s,k);
+            const sl=Math.min(c[s].l, chLvl.price-atr) - slbuf;
+            // LIMIT at FVG proximal (top) if valid retrace level; else MARKET at close
+            let entry=c[k].c, orderType='MARKET';
+            if(fvg && fvg.hi>sl && fvg.hi<c[k].c){ entry=fvg.hi; orderType='LIMIT'; }
+            let tp = P.tpmode==='liq' ? (nearestAbove(sw,entry,'H')?.price ?? entry+(entry-sl)*P.rr) : entry+(entry-sl)*P.rr;
+            const risk=entry-sl, rr=risk>0?(tp-entry)/risk:0;
+            debug.sweep={idx:s,level:lvl,wick:c[s].l,dir:'BUY'}; debug.choch={idx:k,level:chLvl.price}; debug.fvg=fvg;
+            if(rr>=P.minrr) return {signal:mkSig('BUY',orderType,entry,sl,tp,rr,c[k].t,fvg,lvl),debug};
+            return {signal:null,debug};
+          }
+        }
+      }
+    }
+  }
+  // ---- BEARISH ----
+  for(let s=last; s>=start; s--){
+    const levels=[]; const swh=lastBefore(sw,s,'H'); if(swh) levels.push(swh.price); if(pdh!=null) levels.push(pdh);
+    for(const lvl of levels){
+      if(c[s].h > lvl && c[s].h <= lvl+Math.max(tol,atr*0.6) && c[s].c < lvl){
+        const chLvl=lastBefore(sw,s,'L'); if(!chLvl) continue;
+        for(let k=s;k<=last;k++){
+          if(c[k].c < chLvl.price && isBearPA(c,k)){
+            const fvg=findBearFVG(c,s,k);
+            const sl=Math.max(c[s].h, chLvl.price+atr) + slbuf;
+            let entry=c[k].c, orderType='MARKET';
+            if(fvg && fvg.lo<sl && fvg.lo>c[k].c){ entry=fvg.lo; orderType='LIMIT'; }
+            let tp = P.tpmode==='liq' ? (nearestBelow(sw,entry,'L')?.price ?? entry-(sl-entry)*P.rr) : entry-(sl-entry)*P.rr;
+            const risk=sl-entry, rr=risk>0?(entry-tp)/risk:0;
+            debug.sweep={idx:s,level:lvl,wick:c[s].h,dir:'SELL'}; debug.choch={idx:k,level:chLvl.price}; debug.fvg=fvg;
+            if(rr>=P.minrr) return {signal:mkSig('SELL',orderType,entry,sl,tp,rr,c[k].t,fvg,lvl),debug};
+            return {signal:null,debug};
+          }
+        }
+      }
+    }
+  }
+  return {signal:null,debug};
+}
+function mkSig(dir,orderType,entry,sl,tp,rr,t,fvg,swLvl){
+  return {dir,orderType,entry,sl,tp,rr,candleTime:t,fvg:fvg?{lo:fvg.lo,hi:fvg.hi}:null,sweepLevel:swLvl};
+}
+
+/* ============ DATA ============ */
+async function fetchCandles(sym){
+  const url=`https://api.twelvedata.com/time_series?symbol=${encodeURIComponent(sym)}&interval=15min&outputsize=160&order=ASC&apikey=${S.key}`;
+  const r=await fetch(url); const j=await r.json();
+  if(j.status==='error') throw new Error(j.message||'API error');
+  if(!j.values) throw new Error('no data');
+  return j.values.map(v=>({t:v.datetime,o:+v.open,h:+v.high,l:+v.low,c:+v.close}));
+}
+function pdhpdl(c){
+  if(!c.length) return {pdh:null,pdl:null};
+  const day=t=>t.slice(0,10), today=day(c[c.length-1].t);
+  let prev=null; for(let i=c.length-1;i>=0;i--){ if(day(c[i].t)!==today){ prev=day(c[i].t); break; } }
+  if(!prev) return {pdh:null,pdl:null};
+  let hi=-Infinity,lo=Infinity; for(const k of c){ if(day(k.t)===prev){ hi=Math.max(hi,k.h); lo=Math.min(lo,k.l);} }
+  return {pdh:isFinite(hi)?hi:null,pdl:isFinite(lo)?lo:null};
+}
+
+/* ============ SCAN ============ */
+let scanning=false;
+async function scanAll(){
+  if(!S.key){ toast('API key daal pehle'); return; }
+  if(scanning) return; scanning=true;
+  document.getElementById('scanBtn').textContent='Scanning…';
+  for(const p of PAIRS){
+    setTile(p.d,'a','fetching…');
+    try{
+      const c=await fetchCandles(p.s);
+      const {pdh,pdl}=pdhpdl(c);
+      const {signal,debug}=detectSetup(c,S.params,pdh,pdl);
+      S.cache[p.d]={candles:c,debug,signal,atr:debug.atr,updated:Date.now()};
+      updateOutcomes(p.d,c);
+      if(signal){
+        const dup=S.log.find(x=>x.pair===p.d && x.candleTime===signal.candleTime);
+        if(!dup){
+          const rec={id:Date.now()+'_'+p.d, pair:p.d, ...signal,
+                     status: signal.orderType==='LIMIT'?'PENDING':'OPEN',
+                     fillTime: signal.orderType==='MARKET'?signal.candleTime:null,
+                     ts:new Date().toISOString()};
+          S.log.unshift(rec); save(); notify(rec);
+          setTile(p.d, signal.dir==='BUY'?'g':'r', `${signal.dir} ${signal.orderType.toLowerCase()}`);
+        } else setTile(p.d,'o','no new setup');
+      } else setTile(p.d,'o','no setup');
+    }catch(e){ setTile(p.d,'r','err: '+e.message); }
+    await new Promise(r=>setTimeout(r,900));
+  }
+  scanning=false;
+  document.getElementById('scanBtn').textContent='Scan Now';
+  document.getElementById('lastScan').textContent='last: '+new Date().toLocaleTimeString('en-IN',{hour12:true,timeZone:'Asia/Kolkata'});
+  renderLive(); renderVerify(); renderStats();
+}
+
+// order lifecycle: PENDING(limit) -> OPEN(fill) -> WIN/LOSS ; PENDING -> EXPIRED
+function updateOutcomes(pair,c){
+  for(const sig of S.log){
+    if(sig.pair!==pair) continue;
+    if(sig.status!=='PENDING' && sig.status!=='OPEN') continue;
+    let bars=0;
+    for(const k of c){
+      if(k.t <= sig.candleTime) continue;
+      bars++;
+      if(sig.status==='PENDING'){
+        if(sig.dir==='BUY'){
+          if(k.l<=sig.entry){ sig.status='OPEN'; sig.fillTime=k.t; }
+          else if(k.h>=sig.tp){ sig.status='EXPIRED'; break; }
+        }else{
+          if(k.h>=sig.entry){ sig.status='OPEN'; sig.fillTime=k.t; }
+          else if(k.l<=sig.tp){ sig.status='EXPIRED'; break; }
+        }
+        if(sig.status==='PENDING' && bars>=S.params.expiry){ sig.status='EXPIRED'; break; }
+      }
+      if(sig.status==='OPEN'){
+        if(sig.dir==='BUY'){
+          if(k.l<=sig.sl){ sig.status='LOSS'; break; }   // ambiguous => LOSS
+          if(k.h>=sig.tp){ sig.status='WIN'; break; }
+        }else{
+          if(k.h>=sig.sl){ sig.status='LOSS'; break; }
+          if(k.l<=sig.tp){ sig.status='WIN'; break; }
+        }
+      }
+    }
+  }
+  save();
+}
+
+/* ============ NOTIFY ============ */
+async function notify(rec){
+  const dp=pairDp(rec.pair);
+  const t=istTime(rec.ts);
+  const msg=`🎯 ${rec.pair} ${rec.dir} ${rec.orderType}\n🕐 ${t} IST\nEntry ${fmt(rec.entry,dp)}\nSL ${fmt(rec.sl,dp)}\nTP ${fmt(rec.tp,dp)}\nRR ${rec.rr.toFixed(2)}`;
+  if(S.tg.token && S.tg.chat){ try{ await fetch(`https://api.telegram.org/bot${S.tg.token}/sendMessage`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:S.tg.chat,text:msg})}); }catch(e){} }
+  if('Notification' in window && Notification.permission==='granted') new Notification(`SweepDesk — ${rec.pair} ${rec.dir}`, {body:msg, tag:rec.id});
+  alertBeep();
+  toast(`${rec.pair} ${rec.dir} ${rec.orderType}`);
+}
+
+/* ============ RENDER ============ */
+function setTile(d,dot,txt){ const el=document.getElementById('tile_'+d); if(!el)return; el.querySelector('.st').innerHTML=`<span class="dot ${dot}"></span>${txt}`; }
+function buildTiles(){
+  const g=document.getElementById('pairGrid'); g.innerHTML='';
+  const sel=document.getElementById('verifyPair'); sel.innerHTML='';
+  PAIRS.forEach(p=>{
+    const t=document.createElement('div'); t.className='tile'; t.id='tile_'+p.d;
+    t.innerHTML=`<div class="p">${p.d}</div><div class="st"><span class="dot o"></span>idle</div>`;
+    t.onclick=()=>{ S.selPair=p.d; switchView('verify'); document.getElementById('verifyPair').value=p.d; renderVerify(); };
+    g.appendChild(t);
+    const o=document.createElement('option'); o.value=p.d; o.textContent=p.d; sel.appendChild(o);
+  });
+}
+function statusPill(st){
+  const map={PENDING:'blue',OPEN:'amber',WIN:'green',LOSS:'red',EXPIRED:'mut'};
+  const cls=map[st]||'mut';
+  return `<span class="${cls}">${st}</span>`;
+}
+function renderLive(){
+  const act=S.log.filter(x=>x.status==='PENDING'||x.status==='OPEN');
+  const pend=act.filter(x=>x.status==='PENDING').length, open=act.filter(x=>x.status==='OPEN').length;
+  document.getElementById('liveCount').textContent=`${pend} pending · ${open} open`;
+  const box=document.getElementById('liveSignals');
+  if(!act.length){ box.innerHTML='<div class="mut" style="font-size:12px;padding:8px 0">Koi active order nahi. Scan chalao.</div>'; return; }
+  box.innerHTML=act.map(s=>{
+    const dp=pairDp(s.pair);
+    return `<div class="sig ${s.dir.toLowerCase()}">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <b>${s.pair} <span class="${s.dir==='BUY'?'green':'red'}">${s.dir} ${s.orderType}</span></b>
+        <span class="row" style="gap:6px;align-items:center"><span class="tag">${statusPill(s.status)}</span><span class="pill ${s.dir==='BUY'?'green':'red'}">RR ${s.rr.toFixed(2)}</span></span>
+      </div>
+      <div class="mut" style="font-size:10px;margin-top:2px">🕐 ${istTime(s.ts)} IST</div>
+      <div class="kv">
+        <span>Entry ${s.orderType==='LIMIT'?'(limit)':''}</span><span>${fmt(s.entry,dp)}</span>
+        <span>SL</span><span class="red">${fmt(s.sl,dp)}</span>
+        <span>TP</span><span class="green">${fmt(s.tp,dp)}</span>
+      </div></div>`;
+  }).join('');
+}
+function renderStats(){
+  const closed=S.log.filter(x=>x.status==='WIN'||x.status==='LOSS');
+  const tp=closed.filter(x=>x.status==='WIN').length, sl=closed.filter(x=>x.status==='LOSS').length;
+  const tot=tp+sl, pend=S.log.filter(x=>x.status==='PENDING'||x.status==='OPEN').length;
+  const acc=tot?Math.round(tp/tot*100):0;
+  const winners=closed.filter(x=>x.status==='WIN'); const avgWinR=winners.length?winners.reduce((a,b)=>a+b.rr,0)/winners.length:0;
+  const exp=tot?((tp/tot)*avgWinR-(sl/tot)):0;
+  document.getElementById('stClosed').textContent=tot;
+  document.getElementById('stAcc').textContent=acc+'%';
+  document.getElementById('stAcc').className=acc>=50?'green':'red';
+  document.getElementById('stExp').textContent=exp.toFixed(2)+'R';
+  document.getElementById('stExp').className=exp>=0?'green':'red';
+  document.getElementById('stTP').textContent=tp;
+  document.getElementById('stSL').textContent=sl;
+  document.getElementById('stPend').textContent=pend;
+
+  // pair-wise
+  const pm={}; PAIRS.forEach(p=>pm[p.d]={sig:0,tp:0,sl:0,rrSum:0});
+  S.log.forEach(s=>{ const r=pm[s.pair]; if(!r)return; r.sig++; if(s.status==='WIN'){r.tp++;r.rrSum+=s.rr;} else if(s.status==='LOSS')r.sl++; });
+  document.querySelector('#pairTable tbody').innerHTML=PAIRS.map(p=>{
+    const r=pm[p.d], cl=r.tp+r.sl, a=cl?Math.round(r.tp/cl*100):0;
+    const avgW=r.tp?r.rrSum/r.tp:0, e=cl?((r.tp/cl)*avgW-(r.sl/cl)):0;
+    const ac=cl?(a>=50?'green':'red'):'mut', ec=cl?(e>=0?'green':'red'):'mut';
+    return `<tr><td>${p.d}</td><td>${r.sig}</td><td class="green">${r.tp}</td><td class="red">${r.sl}</td><td class="${ac}">${cl?a+'%':'—'}</td><td class="${ec}">${cl?e.toFixed(2):'—'}</td></tr>`;
+  }).join('');
+
+  // monthly
+  const mm={};
+  S.log.forEach(s=>{ if(s.status!=='WIN'&&s.status!=='LOSS')return; const k=s.ts.slice(0,7); (mm[k]=mm[k]||{tp:0,sl:0}); if(s.status==='WIN')mm[k].tp++; else mm[k].sl++; });
+  const keys=Object.keys(mm).sort().reverse();
+  document.querySelector('#monthTable tbody').innerHTML = keys.length ? keys.map(k=>{
+    const r=mm[k], cl=r.tp+r.sl, a=Math.round(r.tp/cl*100);
+    const lbl=new Date(k+'-01').toLocaleDateString('en-IN',{month:'short',year:'numeric'});
+    return `<tr><td>${lbl}</td><td>${cl}</td><td class="green">${r.tp}</td><td class="red">${r.sl}</td><td class="${a>=50?'green':'red'}">${a}%</td></tr>`;
+  }).join('') : '<tr><td colspan="5" class="mut">Abhi koi closed trade nahi</td></tr>';
+
+  // full log
+  document.querySelector('#logTable tbody').innerHTML=S.log.slice(0,120).map(s=>{
+    const dp=pairDp(s.pair);
+    const tm=new Date(s.ts).toLocaleString('en-IN',{hour12:true,timeZone:'Asia/Kolkata',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+    return `<tr><td>${tm}</td><td>${s.pair}</td><td><span class="tag">${s.orderType}</span></td><td class="${s.dir==='BUY'?'green':'red'}">${s.dir}</td><td>${fmt(s.entry,dp)}</td><td>${fmt(s.sl,dp)}</td><td>${fmt(s.tp,dp)}</td><td>${s.rr.toFixed(2)}</td><td>${statusPill(s.status)}</td></tr>`;
+  }).join('');
+}
+
+/* ============ CHART ============ */
+function renderVerify(){
+  const pair=document.getElementById('verifyPair').value||S.selPair;
+  const cch=S.cache[pair];
+  const cv=document.getElementById('chart'), tx=document.getElementById('verifyText');
+  const ctx=cv.getContext('2d'); const DPR=window.devicePixelRatio||1;
+  cv.width=cv.clientWidth*DPR; cv.height=cv.clientHeight*DPR; ctx.setTransform(DPR,0,0,DPR,0,0);
+  const W=cv.clientWidth,H=cv.clientHeight; ctx.clearRect(0,0,W,H);
+  if(!cch){ tx.innerHTML='<span class="mut">Scan karo pehle — data aayega.</span>'; return; }
+  const all=cch.candles, dp=pairDp(pair);
+  const view=all.slice(-60), n=view.length, offset=all.length-n;
+  let hi=-Infinity,lo=Infinity; view.forEach(c=>{hi=Math.max(hi,c.h);lo=Math.min(lo,c.l);});
+  const pad=(hi-lo)*0.08; hi+=pad; lo-=pad;
+  const padL=6,padR=54,padT=8,padB=8;
+  const x=i=>padL+i*((W-padL-padR)/(n-1||1));
+  const y=v=>padT+(H-padT-padB)*(1-(v-lo)/(hi-lo||1));
+  const bw=Math.max(2,(W-padL-padR)/n*0.6);
+  view.forEach((c,i)=>{ const up=c.c>=c.o,col=up?'#33d17a':'#ff5252'; ctx.strokeStyle=col; ctx.fillStyle=col; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(x(i),y(c.h)); ctx.lineTo(x(i),y(c.l)); ctx.stroke();
+    const yo=y(c.o),yc=y(c.c); ctx.fillRect(x(i)-bw/2,Math.min(yo,yc),bw,Math.max(1,Math.abs(yc-yo))); });
+  const d=cch.debug;
+  (d.swings||[]).forEach(s=>{ const i=s.idx-offset; if(i<0||i>=n)return; ctx.fillStyle=s.type==='H'?'#ff5252':'#33d17a';
+    ctx.beginPath(); ctx.arc(x(i),y(s.price)+(s.type==='H'?-6:6),2.4,0,7); ctx.fill(); });
+  if(d.fvg){ ctx.fillStyle='rgba(107,77,255,0.22)'; ctx.fillRect(padL,y(d.fvg.hi),W-padL-padR,Math.max(2,y(d.fvg.lo)-y(d.fvg.hi))); }
+  if(d.sweep){ const i=d.sweep.idx-offset; if(i>=0&&i<n){ ctx.strokeStyle='#ffb000'; ctx.lineWidth=1.4;
+    ctx.beginPath(); ctx.arc(x(i),y(d.sweep.wick),5,0,7); ctx.stroke();
+    ctx.setLineDash([4,3]); ctx.beginPath(); ctx.moveTo(padL,y(d.sweep.level)); ctx.lineTo(W-padR,y(d.sweep.level)); ctx.stroke(); ctx.setLineDash([]); } }
+  if(d.choch){ ctx.strokeStyle='#5ac8fa'; ctx.setLineDash([2,3]); ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(padL,y(d.choch.level)); ctx.lineTo(W-padR,y(d.choch.level)); ctx.stroke(); ctx.setLineDash([]); }
+  const sig=cch.signal;
+  if(sig){ [['#e8e2cf',sig.entry],['#ff5252',sig.sl],['#33d17a',sig.tp]].forEach(([col,v])=>{ ctx.strokeStyle=col; ctx.lineWidth=1; ctx.globalAlpha=.8; ctx.beginPath(); ctx.moveTo(padL,y(v)); ctx.lineTo(W-padR,y(v)); ctx.stroke(); ctx.globalAlpha=1; }); }
+  ctx.fillStyle='#7d7a6e'; ctx.font='9px monospace'; ctx.textAlign='left';
+  for(let g=0;g<=4;g++){ const v=lo+(hi-lo)*g/4; ctx.fillText(v.toFixed(dp),W-padR+3,y(v)+3); }
+
+  const parts=[];
+  parts.push(`<b class="amber">${pair}</b> · ATR ${fmt(d.atr,dp)} · ${(d.swings||[]).length} swings`);
+  parts.push(d.sweep?`Sweep: <span class="amber">${d.sweep.dir}</span> wick ${fmt(d.sweep.wick,dp)} took ${fmt(d.sweep.level,dp)}`:'<span class="mut">No sweep in window</span>');
+  if(d.choch) parts.push(`CHoCH: broke ${fmt(d.choch.level,dp)} <span class="blue">✓</span>`);
+  if(d.fvg) parts.push(`FVG (limit zone): ${fmt(d.fvg.lo,dp)} – ${fmt(d.fvg.hi,dp)}`);
+  if(sig) parts.push(`<span class="${sig.dir==='BUY'?'green':'red'}">${sig.dir} ${sig.orderType}</span> · E ${fmt(sig.entry,dp)} / SL ${fmt(sig.sl,dp)} / TP ${fmt(sig.tp,dp)} · RR ${sig.rr.toFixed(2)}`);
+  else parts.push('<span class="mut">No valid signal (RR filter / PA missing)</span>');
+  tx.innerHTML=parts.map(p=>'<div style="padding:2px 0">'+p+'</div>').join('');
+}
+
+/* ============ UI ============ */
+function switchView(v){
+  document.querySelectorAll('.view').forEach(el=>el.classList.remove('on'));
+  document.getElementById('v-'+v).classList.add('on');
+  document.querySelectorAll('.tabbar button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
+  if(v==='verify') renderVerify(); if(v==='log') renderStats();
+}
+document.querySelectorAll('.tabbar button').forEach(b=>b.onclick=()=>switchView(b.dataset.v));
+document.getElementById('saveKey').onclick=()=>{ S.key=document.getElementById('apiKey').value.trim(); LS.set('key',S.key); toast('key saved'); };
+document.getElementById('scanBtn').onclick=scanAll;
+document.getElementById('autoBtn').onclick=function(){ S.auto=!S.auto; this.textContent='Auto: '+(S.auto?'ON':'OFF'); this.classList.toggle('solid',S.auto);
+  if(S.auto){ scanAll(); scheduleAuto(); } else if(S.timer) clearTimeout(S.timer); };
+function scheduleAuto(){ if(!S.auto)return; const now=new Date(); const ms=(15-(now.getMinutes()%15))*60000-now.getSeconds()*1000+3000; S.timer=setTimeout(()=>{ scanAll(); scheduleAuto(); },ms); }
+document.getElementById('verifyPair').onchange=renderVerify;
+
+function loadSet(){
+  const p=S.params;
+  s_L.value=p.L; s_atr.value=p.atr; s_swtol.value=p.swtol; s_slbuf.value=p.slbuf;
+  s_win.value=p.win; s_minrr.value=p.minrr; s_tpmode.value=p.tpmode; s_rr.value=p.rr; s_expiry.value=p.expiry;
+  document.getElementById('tg_token').value=S.tg.token; document.getElementById('tg_chat').value=S.tg.chat;
+  document.getElementById('apiKey').value=S.key;
+}
+document.getElementById('saveSet').onclick=()=>{
+  S.params={ L:+s_L.value, atr:+s_atr.value, swtol:+s_swtol.value, slbuf:+s_slbuf.value, win:+s_win.value,
+    minrr:+s_minrr.value, tpmode:s_tpmode.value, rr:+s_rr.value, expiry:+s_expiry.value };
+  LS.set('params',S.params); toast('params saved');
+};
+document.getElementById('tgSave').onclick=()=>{ S.tg={token:document.getElementById('tg_token').value.trim(),chat:document.getElementById('tg_chat').value.trim()}; LS.set('tg',S.tg); toast('telegram saved'); };
+document.getElementById('tgTest').onclick=async()=>{ if(!S.tg.token||!S.tg.chat){ toast('token/chat daal'); return; }
+  try{ await fetch(`https://api.telegram.org/bot${S.tg.token}/sendMessage`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:S.tg.chat,text:'✅ SweepDesk connected'})}); toast('sent'); }catch(e){ toast('fail'); } };
+function updSoundBtn(){ const b=document.getElementById('soundBtn'); b.textContent='Sound: '+(S.sound?'ON':'OFF'); b.classList.toggle('solid',S.sound); }
+document.getElementById('soundBtn').onclick=()=>{ S.sound=!S.sound; LS.set('sound',S.sound); updSoundBtn(); if(S.sound) alertBeep(); };
+document.getElementById('clearLog').onclick=()=>{ if(confirm('Poora signal log clear kar dein?')){ S.log=[]; save(); renderStats(); renderLive(); } };
+document.getElementById('backupBtn').onclick=()=>{ const blob=new Blob([JSON.stringify({log:S.log,params:S.params},null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='sweepdesk_backup_'+Date.now()+'.json'; a.click(); };
+document.getElementById('restoreBtn').onclick=()=>document.getElementById('restoreFile').click();
+document.getElementById('restoreFile').onchange=e=>{ const f=e.target.files[0]; if(!f)return; const r=new FileReader();
+  r.onload=()=>{ try{ const j=JSON.parse(r.result); if(j.log){S.log=j.log; S.log.forEach(s=>{if(!s.status)s.status=s.out||'OPEN'; if(!s.orderType)s.orderType='MARKET';}); save();} if(j.params){S.params=Object.assign({},DEF,j.params); LS.set('params',S.params);} loadSet(); renderStats(); renderLive(); toast('restored'); }catch(err){ toast('bad file'); } };
+  r.readAsText(f); };
+
+function tick(){ const o={timeZone:'Asia/Kolkata',hour12:true};
+  document.getElementById('istClock').textContent=new Date().toLocaleTimeString('en-IN',{...o,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  document.getElementById('istDate').textContent=new Date().toLocaleDateString('en-IN',{...o,weekday:'short',day:'2-digit',month:'short'}).toUpperCase()+' IST'; }
+setInterval(tick,1000); tick();
+document.getElementById('scanBtn').addEventListener('click',()=>{ if('Notification' in window && Notification.permission==='default') Notification.requestPermission(); },{once:true});
+
+buildTiles(); loadSet(); updSoundBtn(); renderLive(); renderStats();
+window.addEventListener('resize',()=>{ if(document.getElementById('v-verify').classList.contains('on')) renderVerify(); });
+
+/* ============ PWA INSTALL + DIAGNOSTICS ============ */
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); });
+}
+let deferredPrompt=null;
+const installBtn=document.getElementById('installBtn');
+const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
+const standalone=window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+window.addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); deferredPrompt=e; });
+window.addEventListener('appinstalled',()=>{ toast('SweepDesk installed'); });
+
+installBtn.onclick=async()=>{
+  if(deferredPrompt){ deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt=null; return; }
+  if(standalone){ toast('App already installed hai'); return; }
+  if(isIOS){ alert('iOS pe install:\n\nSafari me Share (⬆️) dabao → "Add to Home Screen".'); return; }
+  // no prompt available -> run diagnostics so user sees why
+  switchView('set'); await runDiag(); toast('Install Check dekho — kya fail hai');
+};
+
+async function fetchOk(url){ try{ const r=await fetch(url,{cache:'no-store'}); return {ok:r.ok, code:r.status, res:r}; }catch(e){ return {ok:false, code:0, err:e.message}; } }
+async function runDiag(){
+  const out=document.getElementById('diagOut');
+  out.innerHTML='<span class="mut">checking…</span>';
+  const R=[];
+  const https = location.protocol==='https:' || location.hostname==='localhost';
+  R.push(['HTTPS', https, https ? location.origin : 'file:// / preview se nahi chalega — GitHub Pages URL pe kholo']);
+  R.push(['Not in preview', location.protocol!=='blob:' && location.hostname!=='', location.hostname||'invalid origin']);
+  R.push(['Already installed', standalone, standalone?'haan — home screen se khol':'nahi']);
+
+  const start=await fetchOk('./');
+  R.push(['start_url (./)', start.ok, start.ok?'ok':'FAIL '+(start.code||start.err)+' — file ka naam index.html rakho']);
+
+  const man=await fetchOk('manifest.webmanifest');
+  let manName='';
+  if(man.ok){ try{ manName=(await man.res.json()).name; }catch(e){ man.ok=false; manName='JSON parse fail'; } }
+  R.push(['Manifest', man.ok, man.ok?('loaded: '+manName):('FAIL '+(man.code||man.err)+' — same folder me daalo')]);
+
+  for(const ic of ['icon-192.png','icon-512.png']){
+    const r=await fetchOk(ic);
+    R.push(['Icon '+ic.replace('icon-','').replace('.png',''), r.ok, r.ok?'ok':'FAIL '+(r.code||r.err)]);
+  }
+
+  let swTxt='', swOk=false;
+  if('serviceWorker' in navigator){
+    try{ const reg=await navigator.serviceWorker.getRegistration(); swOk=!!reg; swTxt=reg?('registered · scope '+reg.scope):'not yet — ek baar reload karo'; }catch(e){ swTxt=e.message; }
+  } else swTxt='browser support nahi';
+  R.push(['Service Worker', swOk, swTxt]);
+
+  R.push(['Install prompt ready', !!deferredPrompt, deferredPrompt?'✓ Install button dabao':'nahi aaya (upar koi FAIL hai, ya already installed, ya iOS)']);
+  if(isIOS) R.push(['iOS', true, 'Safari Share → Add to Home Screen']);
+
+  out.innerHTML = R.map(([k,ok,msg])=>{
+    const c = ok?'green':'red', mark=ok?'✓':'✕';
+    return `<div style="display:flex;gap:8px;padding:3px 0;border-bottom:1px solid var(--line)"><span class="${c}" style="width:14px">${mark}</span><b style="min-width:120px">${k}</b><span class="mut" style="flex:1;word-break:break-word">${msg}</span></div>`;
+  }).join('');
+  const fails=R.filter(r=>!r[1] && r[0]!=='Already installed' && r[0]!=='iOS');
+  if(fails.length){ out.innerHTML+='<div class="warn" style="margin-top:8px">Jo bhi ✕ (red) hai wahi install rok raha hai — usko fix kar. Sabse common: file ka naam index.html nahi hai, ya saare files ek folder me nahi hain.</div>'; }
+  else out.innerHTML+='<div style="margin-top:8px" class="green">Sab pass ✓ — agar phir bhi button nahi aaya, Chrome menu (⋮) → "Install app" / "Add to Home screen" try kar.</div>';
+  return R;
+}
+document.getElementById('diagBtn').onclick=runDiag;
+</script>
+</body>
+</html>
