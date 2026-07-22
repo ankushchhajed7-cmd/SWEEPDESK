@@ -185,6 +185,31 @@
   </div>
 </div>
 
+<!-- ============ MY TRADES ============ -->
+<div class="view" id="v-trades">
+  <div class="card">
+    <h3 class="amber">MY TRADES</h3>
+    <div class="mut" style="font-size:11px;margin:4px 0 10px">Sirf jo trades tune "I Took This" kiye. TP/SL auto-track hota hai.</div>
+    <div class="grid6" style="grid-template-columns:repeat(3,1fr)">
+      <div class="stat"><b id="mtClosed">0</b><small>CLOSED</small></div>
+      <div class="stat"><b id="mtAcc" class="green">0%</b><small>ACCURACY</small></div>
+      <div class="stat"><b id="mtExp">0.00R</b><small>EXPECTANCY</small></div>
+    </div>
+    <div class="grid6" style="grid-template-columns:repeat(3,1fr);margin-top:8px">
+      <div class="stat"><b id="mtW" class="green">0</b><small>WINS</small></div>
+      <div class="stat"><b id="mtL" class="red">0</b><small>LOSSES</small></div>
+      <div class="stat"><b id="mtOpen" class="blue">0</b><small>ACTIVE</small></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="row" style="justify-content:space-between;align-items:center">
+      <h3 class="amber">HISTORY</h3>
+      <span class="mut" style="font-size:11px" id="mtCount">0 trades</span>
+    </div>
+    <div id="tradesList"><div class="mut" style="font-size:12px;padding:8px 0">Abhi koi trade nahi liya. Signal card pe "I Took This" dabao.</div></div>
+  </div>
+</div>
+
 <!-- ============ SETTINGS ============ -->
 <div class="view" id="v-set">
   <div class="card">
@@ -243,10 +268,11 @@
   </div>
 </div>
 
-<div class="tabbar">
+<div class="tabbar" style="font-size:10px">
   <button class="on" data-v="scan">SCAN</button>
   <button data-v="verify">VERIFY</button>
   <button data-v="log">STATS</button>
+  <button data-v="trades">TRADES</button>
   <button data-v="set">SETTINGS</button>
 </div>
 
@@ -285,7 +311,7 @@ let S = {
   auto:false, timer:null
 };
 // migrate old 'out' -> 'status'
-S.log.forEach(s=>{ if(!s.status){ s.status = s.out==='WIN'?'WIN':s.out==='LOSS'?'LOSS':'OPEN'; } if(!s.orderType) s.orderType='MARKET'; });
+S.log.forEach(s=>{ if(!s.status){ s.status = s.out==='WIN'?'WIN':s.out==='LOSS'?'LOSS':'OPEN'; } if(!s.orderType) s.orderType='MARKET'; if(s.taken===undefined) s.taken=false; });
 
 function save(){ LS.set('log',S.log); }
 function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1800); }
@@ -446,6 +472,7 @@ async function scanAll(){
         if(!dup){
           const rec={id:Date.now()+'_'+p.d, pair:p.d, ...signal,
                      status: signal.orderType==='LIMIT'?'PENDING':'OPEN',
+                     taken:false,
                      fillTime: signal.orderType==='MARKET'?signal.candleTime:null,
                      ts:new Date().toISOString()};
           S.log.unshift(rec); save(); notify(rec);
@@ -458,7 +485,7 @@ async function scanAll(){
   scanning=false;
   document.getElementById('scanBtn').textContent='Scan Now';
   document.getElementById('lastScan').textContent='last: '+new Date().toLocaleTimeString('en-IN',{hour12:true,timeZone:'Asia/Kolkata'});
-  renderLive(); renderVerify(); renderStats();
+  renderLive(); renderVerify(); renderStats(); renderTrades();
 }
 
 // order lifecycle: PENDING(limit) -> OPEN(fill) -> WIN/LOSS ; PENDING -> EXPIRED
@@ -541,7 +568,11 @@ function renderLive(){
         <span>Entry ${s.orderType==='LIMIT'?'(limit)':''}</span><span>${fmt(s.entry,dp)}</span>
         <span>SL</span><span class="red">${fmt(s.sl,dp)}</span>
         <span>TP</span><span class="green">${fmt(s.tp,dp)}</span>
-      </div></div>`;
+      </div>
+      ${s.taken
+        ? `<div class="row" style="justify-content:space-between;align-items:center;margin-top:8px"><span class="green" style="font-size:11px">✓ Trade liya — My Trades me hai</span><button class="ghost" style="padding:4px 10px;font-size:11px" onclick="untakeTrade('${s.id}')">Undo</button></div>`
+        : `<button class="solid" style="width:100%;margin-top:8px" onclick="takeTrade('${s.id}')">✓ I Took This</button>`}
+      </div>`;
   }).join('');
 }
 function renderStats(){
@@ -631,12 +662,56 @@ function renderVerify(){
   tx.innerHTML=parts.map(p=>'<div style="padding:2px 0">'+p+'</div>').join('');
 }
 
+/* ============ MY TRADES ============ */
+function takeTrade(id){
+  const s=S.log.find(x=>x.id===id); if(!s) return;
+  s.taken=true; save(); renderLive(); renderTrades(); toast('Trade liya — My Trades me add');
+}
+function untakeTrade(id){
+  const s=S.log.find(x=>x.id===id); if(!s) return;
+  s.taken=false; save(); renderLive(); renderTrades();
+}
+function renderTrades(){
+  const taken=S.log.filter(x=>x.taken);
+  const closed=taken.filter(x=>x.status==='WIN'||x.status==='LOSS');
+  const w=closed.filter(x=>x.status==='WIN').length, l=closed.filter(x=>x.status==='LOSS').length;
+  const tot=w+l, act=taken.filter(x=>x.status==='PENDING'||x.status==='OPEN').length;
+  const acc=tot?Math.round(w/tot*100):0;
+  const winners=closed.filter(x=>x.status==='WIN'); const avgWinR=winners.length?winners.reduce((a,b)=>a+b.rr,0)/winners.length:0;
+  const exp=tot?((w/tot)*avgWinR-(l/tot)):0;
+  document.getElementById('mtClosed').textContent=tot;
+  document.getElementById('mtAcc').textContent=acc+'%'; document.getElementById('mtAcc').className=acc>=50?'green':'red';
+  document.getElementById('mtExp').textContent=exp.toFixed(2)+'R'; document.getElementById('mtExp').className=exp>=0?'green':'red';
+  document.getElementById('mtW').textContent=w;
+  document.getElementById('mtL').textContent=l;
+  document.getElementById('mtOpen').textContent=act;
+  document.getElementById('mtCount').textContent=taken.length+' trades';
+  const box=document.getElementById('tradesList');
+  if(!taken.length){ box.innerHTML='<div class="mut" style="font-size:12px;padding:8px 0">Abhi koi trade nahi liya. Signal card pe "I Took This" dabao.</div>'; return; }
+  box.innerHTML=taken.map(s=>{
+    const dp=pairDp(s.pair);
+    return `<div class="sig ${s.dir.toLowerCase()}">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <b>${s.pair} <span class="${s.dir==='BUY'?'green':'red'}">${s.dir} ${s.orderType}</span></b>
+        <span class="row" style="gap:6px;align-items:center"><span class="tag">${statusPill(s.status)}</span><span class="pill ${s.dir==='BUY'?'green':'red'}">RR ${s.rr.toFixed(2)}</span></span>
+      </div>
+      <div class="mut" style="font-size:10px;margin-top:2px">🕐 ${istTime(s.ts)} IST</div>
+      <div class="kv">
+        <span>Entry</span><span>${fmt(s.entry,dp)}</span>
+        <span>SL</span><span class="red">${fmt(s.sl,dp)}</span>
+        <span>TP</span><span class="green">${fmt(s.tp,dp)}</span>
+      </div>
+      <div class="row" style="justify-content:flex-end;margin-top:6px"><button class="ghost" style="padding:3px 10px;font-size:10px" onclick="untakeTrade('${s.id}')">Remove</button></div>
+    </div>`;
+  }).join('');
+}
+
 /* ============ UI ============ */
 function switchView(v){
   document.querySelectorAll('.view').forEach(el=>el.classList.remove('on'));
   document.getElementById('v-'+v).classList.add('on');
   document.querySelectorAll('.tabbar button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
-  if(v==='verify') renderVerify(); if(v==='log') renderStats();
+  if(v==='verify') renderVerify(); if(v==='log') renderStats(); if(v==='trades') renderTrades();
 }
 document.querySelectorAll('.tabbar button').forEach(b=>b.onclick=()=>switchView(b.dataset.v));
 document.getElementById('saveKey').onclick=()=>{ S.key=document.getElementById('apiKey').value.trim(); LS.set('key',S.key); toast('key saved'); };
@@ -676,7 +751,7 @@ function tick(){ const o={timeZone:'Asia/Kolkata',hour12:true};
 setInterval(tick,1000); tick();
 document.getElementById('scanBtn').addEventListener('click',()=>{ if('Notification' in window && Notification.permission==='default') Notification.requestPermission(); },{once:true});
 
-buildTiles(); loadSet(); updSoundBtn(); renderLive(); renderStats();
+buildTiles(); loadSet(); updSoundBtn(); renderLive(); renderStats(); renderTrades();
 window.addEventListener('resize',()=>{ if(document.getElementById('v-verify').classList.contains('on')) renderVerify(); });
 
 /* ============ PWA INSTALL + DIAGNOSTICS ============ */
