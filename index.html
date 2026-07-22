@@ -207,6 +207,7 @@
       <div><label>Limit Expiry (bars)</label><input id="s_expiry" type="number" min="3" max="48" /></div>
       <div><label>Fixed / Fallback RR</label><input id="s_rr" type="number" step="0.1" /></div>
       <div><label>TP Mode</label><select id="s_tpmode"><option value="liq">Opposing Liquidity</option><option value="rr">Fixed RR</option></select></div>
+      <div><label>Require PA candle</label><select id="s_reqpa"><option value="0">No (more signals)</option><option value="1">Yes (stricter)</option></select></div>
     </div>
     <button class="solid" id="saveSet" style="margin-top:12px;width:100%">Save Params</button>
   </div>
@@ -267,7 +268,7 @@ const PAIRS = [
   {d:'USDCAD', s:'USD/CAD', dp:5},
 ];
 
-const DEF = { L:2, atr:14, swtol:0.15, slbuf:0.25, win:8, minrr:1.5, tpmode:'liq', rr:2.0, expiry:12 };
+const DEF = { L:2, atr:14, swtol:0.15, slbuf:0.25, win:18, minrr:1.5, tpmode:'liq', rr:2.0, expiry:12, requirePA:false };
 
 const LS = {
   get:(k,f)=>{ try{const v=localStorage.getItem('sd_'+k);return v==null?f:JSON.parse(v);}catch(e){return f;} },
@@ -357,22 +358,23 @@ function detectSetup(c, P, pdh, pdl){
 
   // ---- BULLISH ----
   for(let s=last; s>=start; s--){
-    const levels=[]; const swl=lastBefore(sw,s,'L'); if(swl) levels.push(swl.price); if(pdl!=null) levels.push(pdl);
+    const levels=sw.filter(x=>x.type==='L' && x.idx<s).slice(-4).map(x=>x.price); if(pdl!=null) levels.push(pdl);
     for(const lvl of levels){
-      if(c[s].l < lvl && c[s].l >= lvl-Math.max(tol,atr*0.6) && c[s].c > lvl){
+      if(c[s].l < lvl && c[s].l >= lvl-Math.max(tol,atr*1.5) && c[s].c > lvl){
         const chLvl=lastBefore(sw,s,'H'); if(!chLvl) continue;
         for(let k=s;k<=last;k++){
-          if(c[k].c > chLvl.price && isBullPA(c,k)){
+          const pa=isBullPA(c,k);
+          if(c[k].c > chLvl.price && (!P.requirePA || pa)){
             const fvg=findBullFVG(c,s,k);
             const sl=Math.min(c[s].l, chLvl.price-atr) - slbuf;
-            // LIMIT at FVG proximal (top) if valid retrace level; else MARKET at close
             let entry=c[k].c, orderType='MARKET';
             if(fvg && fvg.hi>sl && fvg.hi<c[k].c){ entry=fvg.hi; orderType='LIMIT'; }
-            let tp = P.tpmode==='liq' ? (nearestAbove(sw,entry,'H')?.price ?? entry+(entry-sl)*P.rr) : entry+(entry-sl)*P.rr;
-            const risk=entry-sl, rr=risk>0?(tp-entry)/risk:0;
+            const risk=entry-sl;
+            let tp = P.tpmode==='liq' ? (nearestAbove(sw,entry,'H')?.price ?? entry+risk*P.rr) : entry+risk*P.rr;
+            let rr=risk>0?(tp-entry)/risk:0;
+            if(rr<P.minrr){ tp=entry+risk*P.rr; rr=risk>0?(tp-entry)/risk:0; }
             debug.sweep={idx:s,level:lvl,wick:c[s].l,dir:'BUY'}; debug.choch={idx:k,level:chLvl.price}; debug.fvg=fvg;
-            if(rr>=P.minrr) return {signal:mkSig('BUY',orderType,entry,sl,tp,rr,c[k].t,fvg,lvl),debug};
-            return {signal:null,debug};
+            if(rr>=P.minrr) return {signal:mkSig('BUY',orderType,entry,sl,tp,rr,c[k].t,fvg,lvl,pa),debug};
           }
         }
       }
@@ -380,21 +382,23 @@ function detectSetup(c, P, pdh, pdl){
   }
   // ---- BEARISH ----
   for(let s=last; s>=start; s--){
-    const levels=[]; const swh=lastBefore(sw,s,'H'); if(swh) levels.push(swh.price); if(pdh!=null) levels.push(pdh);
+    const levels=sw.filter(x=>x.type==='H' && x.idx<s).slice(-4).map(x=>x.price); if(pdh!=null) levels.push(pdh);
     for(const lvl of levels){
-      if(c[s].h > lvl && c[s].h <= lvl+Math.max(tol,atr*0.6) && c[s].c < lvl){
+      if(c[s].h > lvl && c[s].h <= lvl+Math.max(tol,atr*1.5) && c[s].c < lvl){
         const chLvl=lastBefore(sw,s,'L'); if(!chLvl) continue;
         for(let k=s;k<=last;k++){
-          if(c[k].c < chLvl.price && isBearPA(c,k)){
+          const pa=isBearPA(c,k);
+          if(c[k].c < chLvl.price && (!P.requirePA || pa)){
             const fvg=findBearFVG(c,s,k);
             const sl=Math.max(c[s].h, chLvl.price+atr) + slbuf;
             let entry=c[k].c, orderType='MARKET';
             if(fvg && fvg.lo<sl && fvg.lo>c[k].c){ entry=fvg.lo; orderType='LIMIT'; }
-            let tp = P.tpmode==='liq' ? (nearestBelow(sw,entry,'L')?.price ?? entry-(sl-entry)*P.rr) : entry-(sl-entry)*P.rr;
-            const risk=sl-entry, rr=risk>0?(entry-tp)/risk:0;
+            const risk=sl-entry;
+            let tp = P.tpmode==='liq' ? (nearestBelow(sw,entry,'L')?.price ?? entry-risk*P.rr) : entry-risk*P.rr;
+            let rr=risk>0?(entry-tp)/risk:0;
+            if(rr<P.minrr){ tp=entry-risk*P.rr; rr=risk>0?(entry-tp)/risk:0; }
             debug.sweep={idx:s,level:lvl,wick:c[s].h,dir:'SELL'}; debug.choch={idx:k,level:chLvl.price}; debug.fvg=fvg;
-            if(rr>=P.minrr) return {signal:mkSig('SELL',orderType,entry,sl,tp,rr,c[k].t,fvg,lvl),debug};
-            return {signal:null,debug};
+            if(rr>=P.minrr) return {signal:mkSig('SELL',orderType,entry,sl,tp,rr,c[k].t,fvg,lvl,pa),debug};
           }
         }
       }
@@ -402,8 +406,8 @@ function detectSetup(c, P, pdh, pdl){
   }
   return {signal:null,debug};
 }
-function mkSig(dir,orderType,entry,sl,tp,rr,t,fvg,swLvl){
-  return {dir,orderType,entry,sl,tp,rr,candleTime:t,fvg:fvg?{lo:fvg.lo,hi:fvg.hi}:null,sweepLevel:swLvl};
+function mkSig(dir,orderType,entry,sl,tp,rr,t,fvg,swLvl,pa){
+  return {dir,orderType,entry,sl,tp,rr,candleTime:t,fvg:fvg?{lo:fvg.lo,hi:fvg.hi}:null,sweepLevel:swLvl,pa:!!pa};
 }
 
 /* ============ DATA ============ */
@@ -530,7 +534,7 @@ function renderLive(){
     return `<div class="sig ${s.dir.toLowerCase()}">
       <div class="row" style="justify-content:space-between;align-items:center">
         <b>${s.pair} <span class="${s.dir==='BUY'?'green':'red'}">${s.dir} ${s.orderType}</span></b>
-        <span class="row" style="gap:6px;align-items:center"><span class="tag">${statusPill(s.status)}</span><span class="pill ${s.dir==='BUY'?'green':'red'}">RR ${s.rr.toFixed(2)}</span></span>
+        <span class="row" style="gap:6px;align-items:center">${(s.pa&&s.fvg)?'<span class="tag" style="border-color:var(--green);color:var(--green)">A+</span>':''}<span class="tag">${statusPill(s.status)}</span><span class="pill ${s.dir==='BUY'?'green':'red'}">RR ${s.rr.toFixed(2)}</span></span>
       </div>
       <div class="mut" style="font-size:10px;margin-top:2px">🕐 ${istTime(s.ts)} IST</div>
       <div class="kv">
@@ -645,13 +649,13 @@ document.getElementById('verifyPair').onchange=renderVerify;
 function loadSet(){
   const p=S.params;
   s_L.value=p.L; s_atr.value=p.atr; s_swtol.value=p.swtol; s_slbuf.value=p.slbuf;
-  s_win.value=p.win; s_minrr.value=p.minrr; s_tpmode.value=p.tpmode; s_rr.value=p.rr; s_expiry.value=p.expiry;
+  s_win.value=p.win; s_minrr.value=p.minrr; s_tpmode.value=p.tpmode; s_rr.value=p.rr; s_expiry.value=p.expiry; s_reqpa.value=p.requirePA?'1':'0';
   document.getElementById('tg_token').value=S.tg.token; document.getElementById('tg_chat').value=S.tg.chat;
   document.getElementById('apiKey').value=S.key;
 }
 document.getElementById('saveSet').onclick=()=>{
   S.params={ L:+s_L.value, atr:+s_atr.value, swtol:+s_swtol.value, slbuf:+s_slbuf.value, win:+s_win.value,
-    minrr:+s_minrr.value, tpmode:s_tpmode.value, rr:+s_rr.value, expiry:+s_expiry.value };
+    minrr:+s_minrr.value, tpmode:s_tpmode.value, rr:+s_rr.value, expiry:+s_expiry.value, requirePA:s_reqpa.value==='1' };
   LS.set('params',S.params); toast('params saved');
 };
 document.getElementById('tgSave').onclick=()=>{ S.tg={token:document.getElementById('tg_token').value.trim(),chat:document.getElementById('tg_chat').value.trim()}; LS.set('tg',S.tg); toast('telegram saved'); };
